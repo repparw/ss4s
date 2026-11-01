@@ -5,6 +5,7 @@
 
 #include "ss4s/modapi.h"
 #include "ndl_logging.h"
+#include "render_stats_sampling.h"
 
 extern bool SS4S_NDL_webOS5_Initialized;
 extern pthread_mutex_t SS4S_NDL_webOS5_Lock;
@@ -13,7 +14,7 @@ extern const SS4S_LibraryContext *SS4S_NDL_webOS5_Lib;
 struct SS4S_PlayerContext {
     SS4S_Player *player;
     uint64_t lastFrameTime;
-    uint64_t lastRenderStatsSampleTime;
+    NDL_RenderStatsSampler renderStatsSampler;
     NDL_DIRECTMEDIA_DATA_INFO_T mediaInfo;
     struct SS4S_OpusEmpty *opusEmpty;
     struct SS4S_NDLOpusFix *opusFix;

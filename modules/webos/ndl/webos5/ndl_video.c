@@ -58,6 +58,8 @@ static SS4S_VideoOpenResult OpenVideo(const SS4S_VideoInfo *info, const SS4S_Vid
             goto finish;
     }
     context->mediaInfo.video.unknown1 = 0;
+    ndl_sampler_init(&context->renderStatsSampler, info->frameRateNumerator,
+                     info->frameRateDenominator, (uint32_t) GetTimeUs());
     result = ReloadWithSize(context, info->width, info->height);
     if (result != SS4S_VIDEO_OPEN_OK) {
         goto finish;
@@ -86,11 +88,11 @@ static SS4S_VideoFeedResult FeedVideo(SS4S_VideoInstance *instance, const unsign
         return SS4S_VIDEO_FEED_ERROR;
     }
     uint64_t now = GetTimeUs();
-    // Sampling this hardware API after every frame adds work to the decode hot path.
-    // Keep updating the inter-frame interval even when we skip a stats query.
+    // Choose a randomized frame within each nominal ~100 ms frame-count
+    // block. This avoids phase-locking queries to a particular jittered
+    // arrival interval, unlike a wall-clock threshold.
     if (context->lastFrameTime > 0 &&
-        ndl_should_sample_render_stats(now, context->lastRenderStatsSampleTime)) {
-        context->lastRenderStatsSampleTime = now;
+        ndl_sampler_should_query(&context->renderStatsSampler)) {
         int renderBufferLength = 0;
         if (NDL_DirectVideoGetRenderBufferLength(&renderBufferLength) == 0) {
             float bufLen = renderBufferLength > 0 ? (float) renderBufferLength : 0.5f;
