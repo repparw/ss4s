@@ -86,16 +86,20 @@ static SS4S_VideoFeedResult FeedVideo(SS4S_VideoInstance *instance, const unsign
         return SS4S_VIDEO_FEED_ERROR;
     }
     uint64_t now = GetTimeUs();
-    // Sampling this hardware API after every frame adds work to the decode hot path.
-    // Keep updating the inter-frame interval even when we skip a stats query.
-    if (context->lastFrameTime > 0 &&
-        ndl_should_sample_render_stats(now, context->lastRenderStatsSampleTime)) {
-        context->lastRenderStatsSampleTime = now;
-        int renderBufferLength = 0;
-        if (NDL_DirectVideoGetRenderBufferLength(&renderBufferLength) == 0) {
-            float bufLen = renderBufferLength > 0 ? (float) renderBufferLength : 0.5f;
-            float latency = bufLen * (float) (now - context->lastFrameTime);
-            SS4S_NDL_webOS5_Lib->VideoStats.ReportFrame(context->player, (int) latency);
+    // Query NDL infrequently but record one estimate for *each* frame,
+    // using the most recently observed buffer occupancy. This avoids
+    // threshold-selecting particular frame intervals in the stats average.
+    if (context->lastFrameTime > 0) {
+        NDL_RenderStatsCache *cache = &context->renderStatsCache;
+        if (ndl_should_sample_render_stats(now, cache->lastSampleTimeUs)) {
+            int renderBufferLength = 0;
+            int queryResult = NDL_DirectVideoGetRenderBufferLength(&renderBufferLength);
+            ndl_record_render_stats_sample(cache, now, queryResult, renderBufferLength);
+        }
+        int latencyUs;
+        if (ndl_estimate_render_stats_latency(cache, now,
+                                               now - context->lastFrameTime, &latencyUs)) {
+            SS4S_NDL_webOS5_Lib->VideoStats.ReportFrame(context->player, latencyUs);
         }
     }
     context->lastFrameTime = now;
