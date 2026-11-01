@@ -42,6 +42,14 @@ over 64 deterministic seeds yields ~16.701 ms. This test exercises policy
 logic, not physical NDL queries; taking the mean over seeds does not
 represent any one player's run.
 
+For perspective, a single 2-second 60 FPS window has approximately 20
+stratified queries. Simulating 20,000 deterministic seeds against the same
+synthetic jitter gives a mean of ~16.667 ms but a 5th–95th percentile of
+**14.9–18.7 ms** in individual 2-second windows. Randomizing removes
+persistent phase bias *in expectation*, but creates real per-window variance.
+This is a significant cost if the overlay expects stable low-variance stats.
+(The distribution is a synthetic model, not a confidence interval or C3 data.)
+
 ## Before deployment
 
 Run actual-code jitter replays from the TV testing artifacts using both
