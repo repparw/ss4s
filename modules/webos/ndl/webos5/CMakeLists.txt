@@ -31,3 +31,8 @@ target_link_libraries(${SS4S_MODULE_TARGET} PRIVATE ${NDL_DIRECTMEDIA_V2_LIBRARI
         pthread dl ss4s-opus-empty ss4s-opus-fix ss4s-webos-utils)
 target_compile_definitions(${SS4S_MODULE_TARGET} PRIVATE NDL_DIRECTMEDIA_API_VERSION=2 _GNU_SOURCE)
 target_compile_options(${SS4S_MODULE_TARGET} PRIVATE -Wno-error=attributes)
+option(SS4S_NDL_PRESENT_DIAGNOSTICS "Trace NDL submission timing and audio clock lifecycle" OFF)
+if (SS4S_NDL_PRESENT_DIAGNOSTICS)
+    target_sources(${SS4S_MODULE_TARGET} PRIVATE ndl_diagnostics.c)
+    target_compile_definitions(${SS4S_MODULE_TARGET} PRIVATE SS4S_NDL_PRESENT_DIAGNOSTICS)
+endif ()

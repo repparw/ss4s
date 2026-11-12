@@ -30,6 +30,7 @@ static SS4S_PlayerContext *ActivatePlayerContext = NULL;
 
 int SS4S_NDL_webOS5_ReloadMedia(SS4S_PlayerContext *context) {
     SS4S_NDL_webOS5_Log(SS4S_LogLevelInfo, "NDL", "Reloading media");
+    NDL_DIAG_EVENT(context, "reload_request", 0, 0);
     if (UnloadMedia(context) != 0) {
         return -1;
     }
@@ -52,12 +53,19 @@ static SS4S_PlayerContext *CreatePlayerContext(SS4S_Player *player) {
     assert(ActivatePlayerContext == NULL);
     SS4S_PlayerContext *created = calloc(1, sizeof(SS4S_PlayerContext));
     created->player = player;
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    pthread_mutex_init(&created->diagLock, NULL);
+    created->diagSession = SS4S_NDL_DiagNow();
+#endif
     ActivatePlayerContext = created;
     return created;
 }
 
 static void DestroyPlayerContext(SS4S_PlayerContext *context) {
     UnloadMedia(context);
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    pthread_mutex_destroy(&context->diagLock);
+#endif
     free(context);
     assert(context == ActivatePlayerContext);
     ActivatePlayerContext = NULL;
@@ -73,6 +81,7 @@ static int UnloadMedia(SS4S_PlayerContext *context) {
         SS4S_NDL_webOS5_Log(SS4S_LogLevelInfo, "NDL", "Unloading media");
         context->mediaLoaded = false;
         ret = NDL_DirectMediaUnload();
+        NDL_DIAG_EVENT(context, "unload", 0, ret);
     }
     return ret;
 }
@@ -97,15 +106,19 @@ static int LoadMedia(SS4S_PlayerContext *context) {
         return -1;
     } else if (context->waitAudioVideoReady && (info.video.type == 0 || info.audio.type == 0)) {
         SS4S_NDL_webOS5_Log(SS4S_LogLevelInfo, "NDL", "Defer LoadMedia because audio or video has no type");
+        NDL_DIAG_EVENT(context, "load_deferred", 0, 0);
         return 0;
     }
     SS4S_NDL_webOS5_Log(SS4S_LogLevelInfo, "NDL", "NDL_DirectMediaLoad(video=%u (%d*%d), atype=%u)", info.video.type,
                         info.video.width, info.video.height, info.audio.type);
+    NDL_DIAG_EVENT(context, "load_attempt", 0, 0);
     if ((ret = NDL_DirectMediaLoad(&info, LoadCallback)) != 0) {
+        NDL_DIAG_EVENT(context, "load_failed", 0, ret);
         SS4S_NDL_webOS5_Log(SS4S_LogLevelWarn, "NDL", "NDL_DirectMediaLoad returned %d: %s", ret,
                             NDL_DirectMediaGetError());
         return ret;
     }
+    NDL_DIAG_EVENT(context, "load_returned", 0, ret);
     if (context->mediaInfo.audio.type == NDL_AUDIO_TYPE_PCM) {
         unsigned short empty_buf[8] = {0};
         int numChannels = 2;
@@ -115,13 +128,20 @@ static int LoadMedia(SS4S_PlayerContext *context) {
             numChannels = 6;
         }
         size_t size = numChannels * sizeof(unsigned short);
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+        uint64_t diagPts = SS4S_NDL_webOS5_GetPts(context);
+        int diagRc = NDL_DirectAudioPlay(empty_buf, size, (long long) diagPts);
+        NDL_DIAG_EVENT(context, "prime_pcm", diagPts, diagRc);
+#else
         NDL_DirectAudioPlay(empty_buf, size, (long long) SS4S_NDL_webOS5_GetPts(context));
+#endif
     } else if (context->opusEmpty != NULL) {
         SS4S_OpusEmptyFeed(context->opusEmpty, OpusFeedEmpty, context);
     }
 
     context->mediaLoaded = true;
     clock_gettime(CLOCK_MONOTONIC, &context->mediaLoadedTime);
+    NDL_DIAG_EVENT(context, "origin_assigned", 0, 0);
     return ret;
 }
 
@@ -149,5 +169,13 @@ static void LoadCallback(int type, long long numValue, const char *strValue) {
 }
 
 static int OpusFeedEmpty(void *arg, const unsigned char *data, size_t size) {
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    SS4S_PlayerContext *context = arg;
+    uint64_t pts = SS4S_NDL_webOS5_GetPts(context);
+    int rc = NDL_DirectAudioPlay((void *) data, size, (long long) pts);
+    NDL_DIAG_EVENT(context, "prime_opus", pts, rc);
+    return rc;
+#else
     return NDL_DirectAudioPlay((void *) data, size, (long long) SS4S_NDL_webOS5_GetPts(arg));
+#endif
 }
