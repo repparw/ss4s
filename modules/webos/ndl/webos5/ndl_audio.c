@@ -50,6 +50,7 @@ static SS4S_AudioOpenResult OpenAudio(const SS4S_AudioInfo *info, SS4S_AudioInst
     SS4S_NDL_webOS5_Log(SS4S_LogLevelInfo, "NDL", "OpenAudio called");
     pthread_mutex_lock(&SS4S_NDL_webOS5_Lock);
     SS4S_AudioOpenResult result;
+    NDL_DIAG_EVENT(context, "audio_open", 0, 0);
     switch (info->codec) {
         case SS4S_AUDIO_PCM_S16LE: {
             const char *mode = "stereo";
@@ -125,7 +126,7 @@ static SS4S_AudioOpenResult OpenAudio(const SS4S_AudioInfo *info, SS4S_AudioInst
 
 static SS4S_AudioFeedResult FeedAudio(SS4S_AudioInstance *instance, const unsigned char *data, size_t size) {
     pthread_mutex_lock(&SS4S_NDL_webOS5_Lock);
-    const SS4S_PlayerContext *context = (void *) instance;
+    SS4S_PlayerContext *context = (void *) instance;
     if (!context->mediaLoaded) {
         pthread_mutex_unlock(&SS4S_NDL_webOS5_Lock);
         return SS4S_AUDIO_FEED_NOT_READY;
@@ -143,6 +144,7 @@ static SS4S_AudioFeedResult FeedAudio(SS4S_AudioInstance *instance, const unsign
     }
     uint64_t pts = SS4S_NDL_webOS5_GetPts(context);
     rc = NDL_DirectAudioPlay((void *) data, size, (long long) pts);
+    NDL_DIAG_EVENT(context, "audio_feed", pts, rc);
     if (rc != 0) {
         SS4S_NDL_webOS5_Log(SS4S_LogLevelWarn, "NDL", "NDL_DirectAudioPlay returned %d: %s", rc,
                             NDL_DirectMediaGetError());

@@ -39,3 +39,20 @@ ss4s_add_test(pcm_playback_pulse SOURCES test_pcm_playback.c ARGS pulse)
 ss4s_add_test(pcm_playback_mmal SOURCES test_h264_playback.c ARGS mmal)
 
 ss4s_add_test(h264_playback_lgnc SOURCES test_h264_playback.c ARGS lgnc)
+ss4s_add_test(ndl_diag_stats SOURCES test_ndl_diag_stats.c)
+
+if (TARGET ss4s-module-ndl-webos5)
+    include(WebOSUserland)
+    foreach(mode IN ITEMS on off)
+        add_executable(ndl_diag_lifecycle_${mode} test_ndl_diag_lifecycle.c
+            ../modules/webos/ndl/webos5/ndl_player.c ../modules/webos/ndl/webos5/ndl_video.c)
+        target_include_directories(ndl_diag_lifecycle_${mode} PRIVATE
+            ../modules/interface/include ../include ../modules/webos/utils ${WEBOS_USERLAND_INCLUDE_DIR}/libndl-media)
+        target_link_libraries(ndl_diag_lifecycle_${mode} PRIVATE pthread)
+        if (mode STREQUAL "on")
+            target_sources(ndl_diag_lifecycle_${mode} PRIVATE ../modules/webos/ndl/webos5/ndl_diagnostics.c)
+            target_compile_definitions(ndl_diag_lifecycle_${mode} PRIVATE SS4S_NDL_PRESENT_DIAGNOSTICS)
+        endif ()
+        add_test(NAME ndl_diag_lifecycle_${mode} COMMAND ndl_diag_lifecycle_${mode})
+    endforeach ()
+endif ()

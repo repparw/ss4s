@@ -1,0 +1,18 @@
+name: NDL presentation diagnostics
+on:
+  push:
+    branches: ['diagnostic/ndl-presentation-timing']
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  diagnostic-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: sudo apt-get update && sudo apt-get install -y cmake ninja-build pkg-config libopus-dev python3
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DSS4S_ENABLE_SAMPLES=OFF -DSS4S_NDL_PRESENT_DIAGNOSTICS=ON
+      - run: cmake --build build
+      - run: ctest --test-dir build --output-on-failure --timeout 60
+      - run: python3 -m unittest discover -s tools -v

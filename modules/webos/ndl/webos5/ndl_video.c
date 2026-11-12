@@ -74,14 +74,29 @@ static SS4S_VideoFeedResult FeedVideo(SS4S_VideoInstance *instance, const unsign
                                       SS4S_VideoFeedFlags flags) {
     (void) flags;
     SS4S_PlayerContext *context = (void *) instance;
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    uint64_t diagStart = SS4S_NDL_DiagNow();
+#endif
     if (!context->mediaLoaded) {
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+        SS4S_NDL_DiagFeed(context, diagStart, false, 0, 0, 0);
+#endif
         return SS4S_VIDEO_FEED_NOT_READY;
     }
     uint64_t pts = SS4S_NDL_webOS5_GetPts(context);
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    uint64_t diagPlayStart = SS4S_NDL_DiagNow();
+#endif
     int rc = NDL_DirectVideoPlay((void *) data, size, (long long) pts);
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    uint64_t diagPlayUs = SS4S_NDL_DiagNow() - diagPlayStart;
+#endif
     if (rc != 0) {
         SS4S_NDL_webOS5_Log(SS4S_LogLevelWarn, "NDL", "NDL_DirectVideoPlay returned %d: %s", rc,
                             NDL_DirectMediaGetError());
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+        SS4S_NDL_DiagFeed(context, diagStart, true, pts, rc, diagPlayUs);
+#endif
         return SS4S_VIDEO_FEED_ERROR;
     }
     uint64_t now = GetTimeUs();
@@ -92,6 +107,9 @@ static SS4S_VideoFeedResult FeedVideo(SS4S_VideoInstance *instance, const unsign
         SS4S_NDL_webOS5_Lib->VideoStats.ReportFrame(context->player, (int) latency);
     }
     context->lastFrameTime = now;
+#ifdef SS4S_NDL_PRESENT_DIAGNOSTICS
+    SS4S_NDL_DiagFeed(context, diagStart, true, pts, rc, diagPlayUs);
+#endif
     return SS4S_VIDEO_FEED_OK;
 }
 
